@@ -25,47 +25,44 @@ def twilio_webhook():
     sesion = obtener_sesion(from_number)
     estado = sesion.get("estado")
 
-    print(f"📲 Mensaje recibido de {from_number}, estado actual: {estado}")
-
-    if any(p in body.lower() for p in ["cancelar", "reiniciar", "empezar de nuevo"]):
+    if any(palabra in body.lower() for palabra in ["cancelar", "reiniciar", "empezar de nuevo"]):
         resetear_sesion(from_number)
         return responder("🔄 Proceso cancelado. Puedes empezar una nueva nota cuando gustes.")
 
-    if len(body) > 4096:
-        return responder("⚠️ El mensaje es muy largo (más de 4096 caracteres). Por favor, divide tu nota en varias partes y envíalas una por una usando la palabra *continuar* entre cada parte. Cuando termines, escribe *finalizar*.")
+    # 🎕 Modo nota por partes
+    if body.lower() in ["nota por partes", "nota fragmentada"]:
+        actualizar_sesion(from_number, "estado", "acumulando_partes")
+        actualizar_sesion(from_number, "nota_parcial", "")
+        return responder("🧹 Entendido. Puedes comenzar a enviar la nota en partes. Escribe *finalizado* cuando hayas terminado.")
 
-    if body.lower() == "continuar":
-        actualizar_sesion(from_number, "estado", "acumulando_nota")
-        actualizar_sesion(from_number, "partes", [])
-        return responder("🧩 Perfecto. Envía la primera parte de tu nota. Escribe *finalizar* cuando hayas terminado.")
+    if estado == "acumulando_partes":
+        if body.lower() == "finalizado":
+            texto_completo = sesion.get("nota_parcial", "")
+            resultado = procesar_nota_completa(texto_completo)
 
-    if estado == "acumulando_nota":
-        partes = sesion.get("partes", [])
-        if body.lower() == "finalizar":
-            texto_total = "\n".join(partes)
-            if es_nota_estructurada(texto_total):
-                resultado = procesar_nota_completa(texto_total)
-                titulo = resultado.get("titulo")
-                cuerpo = resultado.get("cuerpo")
-                categorias = resultado.get("categorias_ids", [])
-                autor_id = resultado.get("autor_id")
+            if resultado.get("error"):
+                resetear_sesion(from_number)
+                return responder(f"❌ {resultado['error']}")
 
-                nota_id = guardar_nota(from_number, titulo, cuerpo, categorias, autor_id)
+            titulo = resultado.get("titulo")
+            cuerpo = resultado.get("cuerpo")
+            categorias = resultado.get("categorias_ids", [])
+            autor_id = resultado.get("autor_id")
 
-                actualizar_sesion(from_number, "titulo", titulo)
-                actualizar_sesion(from_number, "cuerpo", cuerpo)
-                actualizar_sesion(from_number, "categorias", categorias)
-                actualizar_sesion(from_number, "autor_id", autor_id)
-                actualizar_sesion(from_number, "nota_id", nota_id)
-                actualizar_sesion(from_number, "estado", "nota_confirmada")
+            actualizar_sesion(from_number, "titulo", titulo)
+            actualizar_sesion(from_number, "cuerpo", cuerpo)
+            actualizar_sesion(from_number, "categorias", categorias)
+            actualizar_sesion(from_number, "autor_id", autor_id)
+            actualizar_sesion(from_number, "estado", "nota_confirmada")
 
-                return responder("✅ Nota completa recibida y guardada. Por favor, envíame ahora la imagen de portada.")
-            else:
-                return responder("⚠️ La nota completa sigue sin tener la estructura adecuada. Asegúrate de incluir título, cuerpo y opcionalmente categoría y autor.")
+            nota_id = guardar_nota(from_number, titulo, cuerpo, categorias, autor_id)
+            actualizar_sesion(from_number, "nota_id", nota_id)
+
+            return responder("✅ Nota completa guardada. ¿Puedes enviarme la imagen de portada?")
         else:
-            partes.append(body)
-            actualizar_sesion(from_number, "partes", partes)
-            return responder("📎 Parte guardada. Puedes seguir enviando otra parte o escribe *finalizar* cuando termines.")
+            acumulado = sesion.get("nota_parcial", "") + "\n" + body
+            actualizar_sesion(from_number, "nota_parcial", acumulado.strip())
+            return responder("📝 Parte recibida. Envía otra o escribe *finalizado* cuando termines.")
 
     if estado == "inicio":
         if es_nota_estructurada(body):
@@ -75,14 +72,14 @@ def twilio_webhook():
             categorias = resultado.get("categorias_ids", [])
             autor_id = resultado.get("autor_id")
 
-            nota_id = guardar_nota(from_number, titulo, cuerpo, categorias, autor_id)
-
             actualizar_sesion(from_number, "titulo", titulo)
             actualizar_sesion(from_number, "cuerpo", cuerpo)
             actualizar_sesion(from_number, "categorias", categorias)
             actualizar_sesion(from_number, "autor_id", autor_id)
-            actualizar_sesion(from_number, "nota_id", nota_id)
             actualizar_sesion(from_number, "estado", "nota_confirmada")
+
+            nota_id = guardar_nota(from_number, titulo, cuerpo, categorias, autor_id)
+            actualizar_sesion(from_number, "nota_id", nota_id)
 
             return responder("✅ Nota guardada con éxito. ¿Puedes enviarme la imagen de portada?")
         else:
@@ -106,7 +103,7 @@ def twilio_webhook():
                 print("⚠️ No se pudo subir la miniatura a WordPress")
 
             actualizar_sesion(from_number, "estado", "esperando_imagenes_cuerpo")
-            return responder("🖼️ Miniatura guardada. Ahora puedes enviarme imágenes para el cuerpo de la nota. Escribe *listo* cuando termines.")
+            return responder("🖼️ Miniatura guardada. Ahora puedes enviarme imágenes para el cuerpo de la nota. Escribe 'listo' cuando termines.")
         else:
             return responder("📸 Por favor, envíame la imagen de portada como archivo adjunto.")
 
@@ -127,10 +124,15 @@ def twilio_webhook():
         else:
             return responder("❗ Por favor, envíame una imagen o escribe *listo* si ya terminaste.")
 
-    else:
-        return responder("👋 Hola, ¿en qué te puedo ayudar hoy?")
+    return responder("👋 Hola, ¿en qué te puedo ayudar hoy?")
 
 def responder(texto):
+    return f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<Response>
+    <Message>{texto}</Message>
+</Response>""", 200, {"Content-Type": "application/xml"}
+
+def enviar_mensaje(telefono, texto):
     return f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <Response>
     <Message>{texto}</Message>

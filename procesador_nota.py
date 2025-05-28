@@ -63,21 +63,7 @@ def normalizar_nombre(nombre_usuario, opciones_validas, threshold=0.6):
 
 def es_nota_estructurada(texto):
     lineas = [line.strip() for line in texto.strip().split('\n') if line.strip()]
-    if len(lineas) < 2:
-        return False
-
-    ciudad_patron = re.compile(r"^(tijuana|ensenada|rosarito|mexicali|tecate)\.-", re.IGNORECASE)
-    
-    if not ciudad_patron.match(lineas[1]):
-        print("🔍 La segunda línea no coincide con ciudad esperada:", lineas[1])
-        return False
-
-    if len(lineas) < 4:  # aseguramos desarrollo mínimo
-        print("📝 Nota demasiado corta.")
-        return False
-
-    return True
-
+    return bool(lineas) and len(lineas) > 1
 
 def procesar_nota_completa(texto):
     lineas = [line.strip() for line in texto.strip().split('\n') if line.strip()]
@@ -147,16 +133,3 @@ def procesar_nota_completa(texto):
         "categorias_ids": categoria_ids,
         "autor_id": autor_id
     }
-
-# Prueba manual
-if __name__ == "__main__":
-    mensaje = '''
-Tijuana.- Reportan balacera en zona centro.
-
-Varias unidades llegaron tras llamados de emergencia.
-
-Categoría: Seguridad, Comunicados Fiscalía
-Author: isaí lara
-'''
-    resultado = procesar_nota_completa(mensaje)
-    print(resultado)

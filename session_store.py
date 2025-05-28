@@ -4,19 +4,20 @@ from collections import defaultdict
 
 # Diccionario global de sesiones por número de teléfono
 sesiones = defaultdict(dict)
+
 def iniciar_sesion(telefono):
     if telefono not in sesiones:
         sesiones[telefono] = {
             "estado": "inicio",
-            "nota": "",
+            "nota_acumulada": "",
+            "nota_por_partes": False,
             "titulo": "",
             "cuerpo": "",
             "categorias_detectadas": [],
             "categoria_confirmada": None,
             "esperando_categoria": False,
             "imagenes": [],
-            "imagen_portada": None,
-            "partes": []  # 🆕 Agregado para notas largas por partes
+            "imagen_portada": None
         }
     return sesiones[telefono]
 
@@ -31,6 +32,3 @@ def actualizar_sesion(telefono, clave, valor):
 def resetear_sesion(telefono):
     if telefono in sesiones:
         del sesiones[telefono]
-
-#ai_model_r1	
-#wAVW GzC8 JX6D VYJ9 9xKc gdIA
