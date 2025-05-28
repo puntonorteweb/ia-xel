@@ -4,7 +4,6 @@ from collections import defaultdict
 
 # Diccionario global de sesiones por número de teléfono
 sesiones = defaultdict(dict)
-
 def iniciar_sesion(telefono):
     if telefono not in sesiones:
         sesiones[telefono] = {
@@ -16,7 +15,8 @@ def iniciar_sesion(telefono):
             "categoria_confirmada": None,
             "esperando_categoria": False,
             "imagenes": [],
-            "imagen_portada": None
+            "imagen_portada": None,
+            "partes": []  # 🆕 Agregado para notas largas por partes
         }
     return sesiones[telefono]
 

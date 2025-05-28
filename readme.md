@@ -1,14 +1,27 @@
-# 🧠 Punto Whats — Bot de WhatsApp con DeepSeek LLM
+Aquí tienes todo el contenido limpio, listo para **copiar y pegar directamente** en tu `README.md`:
 
-Este proyecto conecta WhatsApp (vía Twilio) con DeepSeek Chat para interpretar instrucciones enviadas por texto y responder automáticamente. Ideal para flujos de redacción, publicación y automatización.
+---
+
+````markdown
+# 🧠 Punto Whats — Bot de Redacción y Publicación Automática vía WhatsApp
+
+Este proyecto permite a periodistas redactar y publicar **notas completas** vía WhatsApp.  
+Conecta Twilio (WhatsApp) con DeepSeek Chat, PostgreSQL y WordPress para ofrecer un **flujo conversacional inteligente** y automatizado:
+
+- Interpreta notas con o sin estructura  
+- Extrae título, cuerpo, autor y categoría(s)  
+- Solicita imágenes (miniatura y cuerpo)  
+- Publica directamente en WordPress como borrador o entrada  
 
 ---
 
 ## 🚀 Requisitos
 
-- Python 3.11+
-- Cuenta de Twilio con sandbox de WhatsApp habilitado
-- API Key de DeepSeek
+- Python 3.11+  
+- Cuenta Twilio con sandbox de WhatsApp habilitado  
+- API Key de DeepSeek  
+- PostgreSQL (local o Render.com)  
+- WordPress con endpoint habilitado para publicación  
 
 ---
 
@@ -22,11 +35,18 @@ source punto-whats-env/bin/activate  # o .\punto-whats-env\Scripts\activate en W
 # Instalar dependencias
 pip install -r requirements.txt
 
-# Crear archivo .env con tu API Key
-echo "DEEPSEEK_API_KEY=sk-xxxx" > .env
+# Crear archivo .env con tus claves
+touch .env
+````
 
-# Correr servidor local
-python main.py
+Ejemplo de `.env`:
+
+```
+DEEPSEEK_API_KEY=sk-xxx
+WORDPRESS_URL=https://tusitio.com
+WORDPRESS_USER=usuario
+WORDPRESS_PASSWORD=clave_app
+DATABASE_URL=postgresql://usuario:password@host:puerto/nombre_db
 ```
 
 ---
@@ -37,9 +57,10 @@ python main.py
 ngrok http 8000
 ```
 
-Copia la URL que te da ngrok (ej: `https://abcd1234.ngrok.io`) y pégala en:
+Copia la URL (ej. `https://abcd1234.ngrok.io`) y pégala en:
 
 **Twilio Console → Messaging → Sandbox Settings → When a message comes in:**
+
 ```
 https://abcd1234.ngrok.io/twilio-webhook
 ```
@@ -48,38 +69,81 @@ https://abcd1234.ngrok.io/twilio-webhook
 
 ## ☁️ Despliegue en Render.com
 
-1. Asegúrate de tener estos archivos en tu repo:
-   - `requirements.txt`
-   - `Procfile`
-   - `render.yaml`
-   - `main.py`
-   - `deepseek_client.py`
+1. Confirma que tu repo tenga estos archivos:
 
-2. En tu cuenta de Render, crea un nuevo servicio **Web** desde GitHub
+   * `main.py`
+   * `requirements.txt`
+   * `Procfile`
+   * `render.yaml`
+   * `deepseek_client.py`, `procesador_nota.py`, `publicador.py`, etc.
 
-3. Render detectará `render.yaml` y configurará todo automáticamente
+2. En tu cuenta de [Render](https://render.com), crea un nuevo servicio **Web Service** desde GitHub
 
-4. En el panel del servicio, agrega esta variable de entorno:
-   - Key: `DEEPSEEK_API_KEY`
-   - Value: tu API Key de DeepSeek
+3. Render detectará `render.yaml` automáticamente
 
-5. El servicio quedará disponible en `https://tuservicio.onrender.com/twilio-webhook`
+4. Agrega las siguientes variables de entorno:
 
-Usa esa URL en el panel de Twilio en lugar de ngrok.
+   * `DEEPSEEK_API_KEY`
+   * `WORDPRESS_URL`
+   * `WORDPRESS_USER`
+   * `WORDPRESS_PASSWORD`
+   * `DATABASE_URL`
+
+5. El servicio quedará disponible en:
+
+```
+https://tuservicio.onrender.com/twilio-webhook
+```
+
+Usa esta URL en el panel de Twilio.
 
 ---
 
-## 🧪 Probar
+## 💡 Flujo conversacional
 
-Envía cualquier mensaje desde tu WhatsApp al número del sandbox Twilio. El bot responderá usando DeepSeek Chat.
+1. El usuario envía una **nota** (estructurada o no)
+2. Si está estructurada, se procesa de inmediato
+3. Si no, se interpreta con DeepSeek
+4. El bot solicita:
+
+   * 🖼️ Imagen de portada (miniatura)
+   * 📷 Imágenes para el cuerpo de la nota
+5. El usuario escribe “*listo*” para publicar
+6. El sistema publica automáticamente la nota en WordPress
 
 ---
 
-## ✨ Pendientes futuros
+## 🧠 ¿Qué se considera una nota estructurada?
 
-- Parseo en JSON con estructura de acción
-- Publicación directa en WordPress
-- Memoria de usuario por sesión
-- Blur, miniaturas y análisis multimedia (opcional)
+Una nota que incluya al menos:
+
+```
+Primer párrafo = Título
+
+Resto = Cuerpo
+
+Categoría: Seguridad, Comunidad  
+Autor: Isaí Lara
+```
+
+---
+
+## ✅ Listo para producción
+
+* 🎯 Publica automáticamente en WordPress
+* 🧩 Guarda miniatura como imagen destacada
+* 🗃️ Almacena notas e imágenes en PostgreSQL
+* 🤖 Interpreta libremente cuando no hay estructura
+
+---
+
+## ✨ Mejoras futuras
+
+* Validación de duplicados
+* Corrección ortográfica y formateo automático
+* Envío de resumen por email o Telegram
+* Agregado de etiquetas y campos personalizados
+
+```
 
 ---
