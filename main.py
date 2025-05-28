@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from deepseek_client import interpretar_mensaje_conversacional
 from session_store import obtener_sesion, actualizar_sesion, resetear_sesion
 from db_postgres import crear_tablas, guardar_nota, guardar_imagen, actualizar_miniatura_wp
-from procesador_nota import procesar_nota_completa
+from procesador_nota import procesar_nota_completa, es_nota_estructurada
 from wordpress_upload import subir_imagen_remota_a_wordpress
 from publicador import publicar_nota_en_wordpress
 
@@ -31,7 +31,7 @@ def twilio_webhook():
 
 
     if estado == "inicio":
-        if len(body.split("\n")) > 1 and "categoría:" in body.lower():
+        if es_nota_estructurada(body):
             resultado = procesar_nota_completa(body)
             titulo = resultado.get("titulo")
             cuerpo = resultado.get("cuerpo")
@@ -53,7 +53,15 @@ def twilio_webhook():
             historial = sesion.get("historial", [])
             historial.append({"role": "user", "content": body})
             historial = historial[-3:]
-            respuesta = interpretar_mensaje_conversacional(historial)
+            # respuesta = interpretar_mensaje_conversacional(historial)
+            try:
+                respuesta = interpretar_mensaje_conversacional(historial)
+                if not respuesta:
+                    raise ValueError("Respuesta vacía")
+            except Exception as e:
+                print(f"❌ DeepSeek error: {e}")
+                return responder("⚠️ Hubo un problema procesando tu mensaje. Intenta escribirlo nuevamente o resume un poco.")
+
             historial.append({"role": "assistant", "content": respuesta})
             actualizar_sesion(from_number, "historial", historial[-6:])
             return responder(respuesta)
