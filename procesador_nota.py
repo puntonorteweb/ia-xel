@@ -62,18 +62,22 @@ def normalizar_nombre(nombre_usuario, opciones_validas, threshold=0.6):
     return None
 
 def es_nota_estructurada(texto):
-    """
-    Verifica si un mensaje contiene al menos:
-    - Un título
-    - Un cuerpo
-    - Una línea con 'Categoría:'
-    - Una línea con 'Autor:'
-    """
-    lineas = [l.strip() for l in texto.strip().splitlines() if l.strip()]
-    contiene_categoria = any("categoría:" in l.lower() for l in lineas)
-    contiene_autor = any("autor:" in l.lower() or "author:" in l.lower() for l in lineas)
-    tiene_minimo_3_lineas = len(lineas) >= 3
-    return contiene_categoria and contiene_autor and tiene_minimo_3_lineas
+    lineas = [line.strip() for line in texto.strip().split('\n') if line.strip()]
+    if len(lineas) < 2:
+        return False
+
+    ciudad_patron = re.compile(r"^(tijuana|ensenada|rosarito|mexicali|tecate)\.-", re.IGNORECASE)
+    
+    if not ciudad_patron.match(lineas[1]):
+        print("🔍 La segunda línea no coincide con ciudad esperada:", lineas[1])
+        return False
+
+    if len(lineas) < 4:  # aseguramos desarrollo mínimo
+        print("📝 Nota demasiado corta.")
+        return False
+
+    return True
+
 
 def procesar_nota_completa(texto):
     lineas = [line.strip() for line in texto.strip().split('\n') if line.strip()]

@@ -35,6 +35,7 @@ def twilio_webhook():
     if estado == "inicio":
         print("🔍 Estado: INICIO")
         if es_nota_estructurada(body):
+            print("📄 Texto recibido:\n", body)
             print("🧠 Nota estructurada detectada")
             resultado = procesar_nota_completa(body)
             print("📄 Resultado procesado:", resultado)
@@ -47,7 +48,7 @@ def twilio_webhook():
             cuerpo = resultado.get("cuerpo")
             categorias = resultado.get("categorias_ids", [])
             autor_id = resultado.get("autor_id")
-
+            
             actualizar_sesion(from_number, "titulo", titulo)
             actualizar_sesion(from_number, "cuerpo", cuerpo)
             actualizar_sesion(from_number, "categorias", categorias)
