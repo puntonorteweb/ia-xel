@@ -43,7 +43,7 @@ def interpretar_mensaje_conversacional(historial):
         "messages": mensajes,
         "temperature": 0.6,
         "top_p": 0.9,
-        "max_tokens": 3000  # Ajuste para asegurar respuestas largas
+        "max_tokens": 4000  # Ajuste para asegurar respuestas largas
     }
 
     try:
