@@ -23,43 +23,21 @@ def twilio_webhook():
     media_url = form.get("MediaUrl0") if num_media > 0 else None
 
     sesion = obtener_sesion(from_number)
-    estado = sesion.get("estado")
+    estado = sesion.get("estado", "inicio")
 
+    # 🚨 Comandos de reinicio
     if any(palabra in body.lower() for palabra in ["cancelar", "reiniciar", "empezar de nuevo"]):
         resetear_sesion(from_number)
         return responder("🔄 Proceso cancelado. Puedes empezar una nueva nota cuando gustes.")
 
+    # 🧩 Inicio
     if estado == "inicio":
-        if es_nota_estructurada(body):
-            resultado = procesar_nota_completa(body)
-            titulo = resultado.get("titulo")
-            cuerpo = resultado.get("cuerpo")
-            categorias_ids = resultado.get("categorias_ids", [])
-            autor_id = resultado.get("autor_id")
-
-            if not categorias_ids:
-                actualizar_sesion(from_number, "titulo", titulo)
-                actualizar_sesion(from_number, "cuerpo", cuerpo)
-                actualizar_sesion(from_number, "estado", "esperando_categoria")
-                return responder("⚠️ No detectamos una *categoría principal* en la nota. Por favor, indícala (por ejemplo: Seguridad, Comunidad, Política).")
-
-            if not autor_id:
-                actualizar_sesion(from_number, "titulo", titulo)
-                actualizar_sesion(from_number, "cuerpo", cuerpo)
-                actualizar_sesion(from_number, "categorias", categorias_ids)
-                actualizar_sesion(from_number, "estado", "esperando_autor")
-                return responder("✍️ ¿Quién es el autor de esta nota? Puedes escribir su nombre (ej: Isaí Lara Bermúdez).")
-
-            actualizar_sesion(from_number, "titulo", titulo)
-            actualizar_sesion(from_number, "cuerpo", cuerpo)
-            actualizar_sesion(from_number, "categorias", categorias_ids)
-            actualizar_sesion(from_number, "autor_id", autor_id)
-            actualizar_sesion(from_number, "estado", "nota_confirmada")
-
-            nota_id = guardar_nota(from_number, titulo, cuerpo, categorias_ids, autor_id)
-            actualizar_sesion(from_number, "nota_id", nota_id)
-
-            return responder("✅ Nota guardada con éxito. ¿Puedes enviarme la imagen de portada?")
+        if body.lower() == "nota por partes":
+            actualizar_sesion(from_number, "estado", "modo_partes")
+            actualizar_sesion(from_number, "partes", [])
+            return responder("✍️ Perfecto. Envía las partes de la nota una por una. Cuando termines, escribe *finalizado*.")
+        elif es_nota_estructurada(body):
+            return procesar_nota_y_pedir_metadata(from_number, body)
         else:
             historial = sesion.get("historial", [])
             historial.append({"role": "user", "content": body})
@@ -69,6 +47,19 @@ def twilio_webhook():
             actualizar_sesion(from_number, "historial", historial[-6:])
             return responder(respuesta)
 
+    # 🧵 Acumulación por partes
+    elif estado == "modo_partes":
+        if body.lower() == "finalizado":
+            partes = sesion.get("partes", [])
+            texto_completo = "\n\n".join(partes)
+            return procesar_nota_y_pedir_metadata(from_number, texto_completo)
+        else:
+            partes = sesion.get("partes", [])
+            partes.append(body)
+            actualizar_sesion(from_number, "partes", partes)
+            return responder(f"🧩 Parte {len(partes)} guardada. Envía la siguiente o escribe *finalizado* para terminar.")
+
+    # 📂 Esperando categoría
     elif estado == "esperando_categoria":
         categoria = normalizar_nombre(body.strip(), CATEGORIAS_PRINCIPALES)
         if categoria in CATEGORIAS_PRINCIPALES:
@@ -77,13 +68,11 @@ def twilio_webhook():
                 actualizar_sesion(from_number, "estado", "esperando_autor")
                 return responder("✍️ ¿Quién es el autor de esta nota? Puedes escribir su nombre (ej: Isaí Lara Bermúdez).")
             else:
-                actualizar_sesion(from_number, "estado", "nota_confirmada")
-                nota_id = guardar_nota(from_number, sesion["titulo"], sesion["cuerpo"], [CATEGORIAS_PRINCIPALES[categoria]], sesion["autor_id"])
-                actualizar_sesion(from_number, "nota_id", nota_id)
-                return responder("✅ Categoría añadida y nota guardada. ¿Puedes enviarme la imagen de portada?")
+                return guardar_y_pedir_miniatura(from_number)
         else:
             return responder("⚠️ Esa categoría no es válida. Prueba con una de estas: Seguridad, Comunidad, Política, etc.")
 
+    # ✒️ Esperando autor
     elif estado == "esperando_autor":
         nombre_autor = normalizar_nombre(body.strip(), AUTORES_DISPONIBLES)
         autor_id = AUTORES_DISPONIBLES.get(nombre_autor) if nombre_autor else None
@@ -93,13 +82,11 @@ def twilio_webhook():
                 actualizar_sesion(from_number, "estado", "esperando_categoria")
                 return responder("⚠️ Ahora indícame la categoría principal (ej: Seguridad, Comunidad).")
             else:
-                actualizar_sesion(from_number, "estado", "nota_confirmada")
-                nota_id = guardar_nota(from_number, sesion["titulo"], sesion["cuerpo"], sesion["categorias"], autor_id)
-                actualizar_sesion(from_number, "nota_id", nota_id)
-                return responder("✅ Autor añadido y nota guardada. ¿Puedes enviarme la imagen de portada?")
+                return guardar_y_pedir_miniatura(from_number)
         else:
             return responder("❌ No encontré ese autor. Asegúrate de escribir su nombre correctamente.")
 
+    # 🖼️ Miniatura
     elif estado == "nota_confirmada":
         if media_url:
             nota_id = sesion.get("nota_id")
@@ -107,15 +94,12 @@ def twilio_webhook():
             url_wp, media_id = subir_imagen_remota_a_wordpress(media_url, sesion.get("titulo", "nota"))
             if media_id:
                 actualizar_miniatura_wp(nota_id, media_id)
-                print(f"📤 Miniatura subida a WP. ID: {media_id}")
-            else:
-                print("⚠️ No se pudo subir la miniatura a WordPress")
-
             actualizar_sesion(from_number, "estado", "esperando_imagenes_cuerpo")
-            return responder("🖼️ Miniatura guardada. Ahora puedes enviarme imágenes para el cuerpo de la nota. Escribe 'listo' cuando termines.")
+            return responder("🖼️ Miniatura guardada. Ahora puedes enviarme imágenes para el cuerpo de la nota. Escribe *listo* cuando termines.")
         else:
             return responder("📸 Por favor, envíame la imagen de portada como archivo adjunto.")
 
+    # 🖼️ Imágenes del cuerpo
     elif estado == "esperando_imagenes_cuerpo":
         if media_url:
             nota_id = sesion.get("nota_id")
@@ -133,16 +117,50 @@ def twilio_webhook():
         else:
             return responder("❗ Por favor, envíame una imagen o escribe *listo* si ya terminaste.")
 
+    # 🧭 Catch-all o saludo inicial
     else:
-        return responder("👋 Hola, ¿en qué te puedo ayudar hoy?")
+        return responder(
+            "👋 Hola, soy tu asistente para publicar notas.\n\n"
+            "📌 Puedes enviar la *nota completa* en un solo mensaje, incluyendo:\n"
+            "1. Título\n2. Cuerpo\n3. Categoría\n4. Autor\n\n"
+            "📍 O bien, si vas a enviarla por partes, escribe: *nota por partes*.\n"
+            "Luego de finalizar, te pediré la imagen de miniatura y las del cuerpo. 🚀"
+        )
 
+# Función para procesar y validar nota
+def procesar_nota_y_pedir_metadata(from_number, texto):
+    resultado = procesar_nota_completa(texto)
+    titulo = resultado.get("titulo")
+    cuerpo = resultado.get("cuerpo")
+    categorias_ids = resultado.get("categorias_ids", [])
+    autor_id = resultado.get("autor_id")
+
+    actualizar_sesion(from_number, "titulo", titulo)
+    actualizar_sesion(from_number, "cuerpo", cuerpo)
+
+    if not categorias_ids:
+        actualizar_sesion(from_number, "estado", "esperando_categoria")
+        return responder("⚠️ No detectamos una *categoría principal* en la nota. Por favor, indícala (por ejemplo: Seguridad, Comunidad, Política).")
+
+    if not autor_id:
+        actualizar_sesion(from_number, "categorias", categorias_ids)
+        actualizar_sesion(from_number, "estado", "esperando_autor")
+        return responder("✍️ ¿Quién es el autor de esta nota? Puedes escribir su nombre (ej: Isaí Lara Bermúdez).")
+
+    actualizar_sesion(from_number, "categorias", categorias_ids)
+    actualizar_sesion(from_number, "autor_id", autor_id)
+    return guardar_y_pedir_miniatura(from_number)
+
+# Función para guardar nota y continuar flujo
+def guardar_y_pedir_miniatura(from_number):
+    sesion = obtener_sesion(from_number)
+    nota_id = guardar_nota(from_number, sesion["titulo"], sesion["cuerpo"], sesion["categorias"], sesion["autor_id"])
+    actualizar_sesion(from_number, "nota_id", nota_id)
+    actualizar_sesion(from_number, "estado", "nota_confirmada")
+    return responder("✅ Nota guardada con éxito. ¿Puedes enviarme la imagen de portada?")
+
+# Respuesta XML para Twilio
 def responder(texto):
-    return f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<Response>
-    <Message>{texto}</Message>
-</Response>""", 200, {"Content-Type": "application/xml"}
-
-def enviar_mensaje(telefono, texto):
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Message>{texto}</Message>
