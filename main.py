@@ -70,7 +70,7 @@ def twilio_webhook():
             return responder(respuesta)
 
     elif estado == "esperando_categoria":
-        categoria = normalizar_nombre(body.strip())
+        categoria = normalizar_nombre(body.strip(), CATEGORIAS_PRINCIPALES)
         if categoria in CATEGORIAS_PRINCIPALES:
             actualizar_sesion(from_number, "categorias", [CATEGORIAS_PRINCIPALES[categoria]])
             if not sesion.get("autor_id"):
@@ -85,7 +85,8 @@ def twilio_webhook():
             return responder("⚠️ Esa categoría no es válida. Prueba con una de estas: Seguridad, Comunidad, Política, etc.")
 
     elif estado == "esperando_autor":
-        autor_id = AUTORES_DISPONIBLES(body.strip())
+        nombre_autor = normalizar_nombre(body.strip(), AUTORES_DISPONIBLES)
+        autor_id = AUTORES_DISPONIBLES.get(nombre_autor) if nombre_autor else None
         if autor_id:
             actualizar_sesion(from_number, "autor_id", autor_id)
             if not sesion.get("categorias"):
