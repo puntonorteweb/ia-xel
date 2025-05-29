@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from deepseek_client import interpretar_mensaje_conversacional
 from session_store import obtener_sesion, actualizar_sesion, resetear_sesion
 from db_postgres import crear_tablas, guardar_nota, guardar_imagen, actualizar_miniatura_wp
-from procesador_nota import procesar_nota_completa, es_nota_estructurada, normalizar_nombre, CATEGORIAS_PRIMARIAS, buscar_autor_por_nombre
+from procesador_nota import procesar_nota_completa, es_nota_estructurada, normalizar_nombre, CATEGORIAS_PRINCIPALES, AUTORES_DISPONIBLES
 from wordpress_upload import subir_imagen_remota_a_wordpress
 from publicador import publicar_nota_en_wordpress
 
@@ -71,21 +71,21 @@ def twilio_webhook():
 
     elif estado == "esperando_categoria":
         categoria = normalizar_nombre(body.strip())
-        if categoria in CATEGORIAS_PRIMARIAS:
-            actualizar_sesion(from_number, "categorias", [CATEGORIAS_PRIMARIAS[categoria]])
+        if categoria in CATEGORIAS_PRINCIPALES:
+            actualizar_sesion(from_number, "categorias", [CATEGORIAS_PRINCIPALES[categoria]])
             if not sesion.get("autor_id"):
                 actualizar_sesion(from_number, "estado", "esperando_autor")
                 return responder("✍️ ¿Quién es el autor de esta nota? Puedes escribir su nombre (ej: Isaí Lara Bermúdez).")
             else:
                 actualizar_sesion(from_number, "estado", "nota_confirmada")
-                nota_id = guardar_nota(from_number, sesion["titulo"], sesion["cuerpo"], [CATEGORIAS_PRIMARIAS[categoria]], sesion["autor_id"])
+                nota_id = guardar_nota(from_number, sesion["titulo"], sesion["cuerpo"], [CATEGORIAS_PRINCIPALES[categoria]], sesion["autor_id"])
                 actualizar_sesion(from_number, "nota_id", nota_id)
                 return responder("✅ Categoría añadida y nota guardada. ¿Puedes enviarme la imagen de portada?")
         else:
             return responder("⚠️ Esa categoría no es válida. Prueba con una de estas: Seguridad, Comunidad, Política, etc.")
 
     elif estado == "esperando_autor":
-        autor_id = buscar_autor_por_nombre(body.strip())
+        autor_id = AUTORES_DISPONIBLES(body.strip())
         if autor_id:
             actualizar_sesion(from_number, "autor_id", autor_id)
             if not sesion.get("categorias"):
