@@ -60,26 +60,30 @@ def twilio_webhook():
         categoria = normalizar_nombre(body.strip(), CATEGORIAS_PRINCIPALES)
         if categoria in CATEGORIAS_PRINCIPALES:
             actualizar_sesion(from_number, "categorias", [CATEGORIAS_PRINCIPALES[categoria]])
-            respuesta = intentar_guardar_nota(from_number)
-            if respuesta:
-                return respuesta
-            actualizar_sesion(from_number, "estado", "esperando_autor")
-            return responder("✍️ ¿Quién es el autor de esta nota? Puedes escribir su nombre (ej: Isaí Lara Bermúdez).")
+            sesion = obtener_sesion(from_number)
+            if sesion.get("titulo") and sesion.get("cuerpo") and sesion.get("autor_id"):
+                return guardar_y_pedir_miniatura(from_number)
+            else:
+                actualizar_sesion(from_number, "estado", "esperando_autor")
+                return responder("✍️ ¿Quién es el autor de esta nota? Puedes escribir su nombre (ej: Isaí Lara Bermúdez).")
         else:
             return responder("⚠️ Esa categoría no es válida. Prueba con una de estas: Seguridad, Comunidad, Política, etc.")
+
 
     elif estado == "esperando_autor":
         nombre_autor = normalizar_nombre(body.strip(), AUTORES_DISPONIBLES)
         autor_id = AUTORES_DISPONIBLES.get(nombre_autor) if nombre_autor else None
         if autor_id:
             actualizar_sesion(from_number, "autor_id", autor_id)
-            respuesta = intentar_guardar_nota(from_number)
-            if respuesta:
-                return respuesta
-            actualizar_sesion(from_number, "estado", "esperando_categoria")
-            return responder("⚠️ Ahora indícame la categoría principal (ej: Seguridad, Comunidad).")
+            sesion = obtener_sesion(from_number)
+            if sesion.get("titulo") and sesion.get("cuerpo") and sesion.get("categorias"):
+                return guardar_y_pedir_miniatura(from_number)
+            else:
+                actualizar_sesion(from_number, "estado", "esperando_categoria")
+                return responder("⚠️ Ahora indícame la categoría principal (ej: Seguridad, Comunidad).")
         else:
             return responder("❌ No encontré ese autor. Asegúrate de escribir su nombre correctamente.")
+
 
     elif estado == "nota_confirmada":
         if media_url:
