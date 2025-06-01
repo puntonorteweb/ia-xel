@@ -240,10 +240,11 @@ def twilio_webhook():
         categoria = normalizar_nombre(body.strip(), CATEGORIAS_PRINCIPALES)
         if categoria in CATEGORIAS_PRINCIPALES:
             actualizar_sesion(from_number, "categorias", [CATEGORIAS_PRINCIPALES[categoria]])
+            # Refrescamos sesión tras actualizar la categoría
             sesion = obtener_sesion(from_number)
             if nota_completa(sesion):
                 return guardar_y_pedir_miniatura(from_number)
-            elif not sesion.get("autor_id"):
+            else:
                 actualizar_sesion(from_number, "estado", "esperando_autor")
                 return responder("✍️ ¿Quién es el autor de esta nota? Puedes escribir su nombre (ej: Isaí Lara Bermúdez).")
         else:
