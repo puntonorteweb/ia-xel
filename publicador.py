@@ -27,7 +27,12 @@ def publicar_nota_en_wordpress(nota_id):
     bloques = []
     imagenes_cuerpo = [img for img in imagenes if img["tipo"] == "cuerpo"]
     for imagen in sorted(imagenes_cuerpo, key=lambda x: x["posicion"] or 0):
-        url_wp, _ = subir_imagen_remota_a_wordpress(imagen["url"], titulo)
+        try:
+            url_wp, _ = subir_imagen_remota_a_wordpress(imagen["url"], titulo)
+        except Exception as e:
+            print(f"❌ Error subiendo imagen {imagen['url']} a WordPress: {e}")
+            url_wp = imagen["url"]  # Fallback al URL original
+
         if url_wp:
             bloques.append(f'<img src="{url_wp}" style="max-width:100%; height:auto;" />')
 
