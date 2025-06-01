@@ -254,10 +254,11 @@ def twilio_webhook():
         autor_id = AUTORES_DISPONIBLES.get(nombre_autor) if nombre_autor else None
         if autor_id:
             actualizar_sesion(from_number, "autor_id", autor_id)
+            # Volvemos a cargar la sesión actualizada para asegurar que refleje el cambio
             sesion = obtener_sesion(from_number)
             if nota_completa(sesion):
                 return guardar_y_pedir_miniatura(from_number)
-            elif not sesion.get("categorias"):
+            else:
                 actualizar_sesion(from_number, "estado", "esperando_categoria")
                 return responder("⚠️ Ahora indícame la categoría principal (ej: Seguridad, Comunidad).")
         else:
