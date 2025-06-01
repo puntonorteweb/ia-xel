@@ -76,7 +76,7 @@ def publicar_nota_en_wordpress(nota_id):
     if featured_media_id:
         payload["featured_media"] = featured_media_id
 
-    response = requests.post(wordpress_url, headers=headers, json=payload)
+    response = requests.post(wordpress_url, headers=headers, json=payload, timeout=90)
 
     if response.status_code in [200, 201]:
         link = response.json().get("link")

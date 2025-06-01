@@ -59,9 +59,9 @@ def subir_imagen_remota_a_wordpress(url_remota, titulo_original, mime_type="imag
         if "api.twilio.com" in url_remota:
             twilio_sid = os.getenv("TWILIO_SID")
             twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
-            response_img = requests.get(url_remota, auth=(twilio_sid, twilio_token), timeout=60)
+            response_img = requests.get(url_remota, auth=(twilio_sid, twilio_token), timeout=90)
         else:
-            response_img = requests.get(url_remota, timeout=60)
+            response_img = requests.get(url_remota, timeout=90)
 
         response_img.raise_for_status()
         image_data = BytesIO(response_img.content)
@@ -72,7 +72,7 @@ def subir_imagen_remota_a_wordpress(url_remota, titulo_original, mime_type="imag
             "Content-Type": mime_type
         }
 
-        response = requests.post(wordpress_url, headers=headers, data=image_data.getvalue(), timeout=60)
+        response = requests.post(wordpress_url, headers=headers, data=image_data.getvalue(), timeout=90)
         if response.status_code in [200, 201]:
             data = response.json()
             return data.get("source_url"), data.get("id")
