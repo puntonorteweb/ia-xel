@@ -45,36 +45,46 @@ def crear_tablas():
             """)
             conn.commit()
 
-def guardar_nota(telefono, titulo, cuerpo, categorias, autor_id=None):
+def guardar_nota(telefono, titulo, cuerpo, categorias=None, autor_id=None):
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO notas (telefono, titulo, cuerpo, categorias, autor_id)
                 VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
-            """, (telefono, titulo, cuerpo, categorias, autor_id))
+            """, (telefono, titulo, cuerpo, categorias or [], autor_id))
             nota_id = cur.fetchone()[0]
             conn.commit()
             return nota_id
 
-def crear_nota_inicial(telefono, titulo, cuerpo):
+def actualizar_categoria_nota(nota_id, categorias):
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO notas (telefono, titulo, cuerpo)
-                VALUES (%s, %s, %s)
-                RETURNING id
-            """, (telefono, titulo, cuerpo))
-            nota_id = cur.fetchone()[0]
+                UPDATE notas
+                SET categorias = %s
+                WHERE id = %s
+            """, (categorias, nota_id))
             conn.commit()
-            return nota_id
 
-def actualizar_nota_por_id(nota_id, campos):
+def actualizar_autor_nota(nota_id, autor_id):
     with get_connection() as conn:
         with conn.cursor() as cur:
-            set_clause = ", ".join([f"{k} = %s" for k in campos.keys()])
-            values = list(campos.values()) + [nota_id]
-            cur.execute(f"UPDATE notas SET {set_clause} WHERE id = %s", values)
+            cur.execute("""
+                UPDATE notas
+                SET autor_id = %s
+                WHERE id = %s
+            """, (autor_id, nota_id))
+            conn.commit()
+
+def actualizar_miniatura_wp(nota_id, media_id):
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE notas
+                SET imagen_miniatura_id = %s
+                WHERE id = %s
+            """, (media_id, nota_id))
             conn.commit()
 
 def guardar_imagen(nota_id, tipo, posicion, url):
@@ -107,36 +117,6 @@ def obtener_imagenes_de_nota(nota_id):
                 ORDER BY tipo, posicion
             """, (nota_id,))
             return cur.fetchall()
-
-def actualizar_miniatura_wp(nota_id, media_id):
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE notas
-                SET imagen_miniatura_id = %s
-                WHERE id = %s
-            """, (media_id, nota_id))
-            conn.commit()
-
-def actualizar_categoria_nota(nota_id, categorias):
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE notas
-                SET categorias = %s
-                WHERE id = %s
-            """, (categorias, nota_id))
-            conn.commit()
-
-def actualizar_autor_nota(nota_id, autor_id):
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE notas
-                SET autor_id = %s
-                WHERE id = %s
-            """, (autor_id, nota_id))
-            conn.commit()
 
 # Prueba manual
 if __name__ == "__main__":

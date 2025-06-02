@@ -113,12 +113,13 @@ def procesar_nota_completa(texto):
 
     if not principal:
         return {
-            "titulo": "",
-            "cuerpo": "",
+            "titulo": lineas_sin_meta[0],
+            "cuerpo": "\n\n".join(lineas_sin_meta[1:]) if len(lineas_sin_meta) > 1 else "",
             "principal": None,
             "secundarias": [],
-            "autor_id": None,
-            "error": "No se detectó una categoría principal válida."
+            "autor_id": AUTORES_DISPONIBLES.get(autor_detectado) if autor_detectado else None,
+            "error": "No se detectó una categoría principal válida.",
+            "categorias_ids": []
         }
 
     titulo = lineas_sin_meta[0]

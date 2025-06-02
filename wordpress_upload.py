@@ -72,7 +72,20 @@ def subir_imagen_remota_a_wordpress(url_remota, titulo_original, mime_type="imag
             "Content-Type": mime_type
         }
 
-        response = requests.post(wordpress_url, headers=headers, data=image_data.getvalue(), timeout=90)
+        try:
+            response = requests.post(
+                wordpress_url,
+                headers=headers,
+                data=image_data.getvalue(),
+                timeout=(10, 25)  # conexión, lectura
+            )
+        except requests.exceptions.ReadTimeout:
+            print("⚠️ Timeout de lectura al subir imagen a WordPress")
+            return None, None
+        except Exception as e:
+            print(f"❌ Error inesperado al subir imagen remota: {e}")
+            return None, None
+
         if response.status_code in [200, 201]:
             data = response.json()
             return data.get("source_url"), data.get("id")
