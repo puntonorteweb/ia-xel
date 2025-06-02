@@ -271,9 +271,13 @@ def twilio_webhook():
         if media_url:
             nota_id = sesion.get("nota_id")
             guardar_imagen(nota_id, tipo="miniatura", posicion=None, url=media_url)
-            url_wp, media_id = subir_imagen_remota_a_wordpress(media_url, sesion.get("titulo", "nota"))
-            if media_id:
-                actualizar_miniatura_wp(nota_id, media_id)
+            try:
+                url_wp, media_id = subir_imagen_remota_a_wordpress(media_url, sesion.get("titulo", "nota"))
+                if media_id:
+                    actualizar_miniatura_wp(nota_id, media_id)
+            except Exception as e:
+                print(f"[ERROR subida WP]: {e}")
+                return responder("⚠️ Ocurrió un error al subir la imagen a WordPress. Intenta enviarla de nuevo.")
             actualizar_sesion(from_number, "estado", "esperando_imagenes_cuerpo")
             return responder("🖼️ Miniatura guardada. Ahora puedes enviarme imágenes para el cuerpo de la nota. Escribe *listo* cuando termines.")
         else:
