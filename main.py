@@ -175,8 +175,22 @@ from flask import Flask, request
 from dotenv import load_dotenv
 from deepseek_client import interpretar_mensaje_conversacional
 from session_store import obtener_sesion, actualizar_sesion, resetear_sesion
-from db_postgres import crear_tablas, guardar_nota, guardar_imagen, actualizar_miniatura_wp, actualizar_categoria_nota, actualizar_autor_nota
-from procesador_nota import procesar_nota_completa, es_nota_estructurada, normalizar_nombre, CATEGORIAS_PRINCIPALES, AUTORES_DISPONIBLES
+from db_postgres import (
+    crear_tablas,
+    crear_nota_inicial,
+    guardar_imagen,
+    actualizar_miniatura_wp,
+    actualizar_categoria_nota,
+    actualizar_autor_nota,
+    obtener_nota_por_id
+)
+from procesador_nota import (
+    procesar_nota_completa,
+    es_nota_estructurada,
+    normalizar_nombre,
+    CATEGORIAS_PRINCIPALES,
+    AUTORES_DISPONIBLES
+)
 from wordpress_upload import subir_imagen_remota_a_wordpress
 from publicador import publicar_nota_en_wordpress
 
@@ -229,17 +243,13 @@ def twilio_webhook():
     elif estado == "esperando_categoria":
         categoria = normalizar_nombre(body.strip(), CATEGORIAS_PRINCIPALES)
         if categoria in CATEGORIAS_PRINCIPALES:
-            categorias_ids = [CATEGORIAS_PRINCIPALES[categoria]]
-            actualizar_sesion(from_number, "categorias", categorias_ids)
             nota_id = sesion.get("nota_id")
             if nota_id:
-                actualizar_categoria_nota(nota_id, categorias_ids)
-            sesion = obtener_sesion(from_number)
-            if nota_completa(sesion):
-                return guardar_y_pedir_miniatura(from_number)
-            else:
+                actualizar_categoria_nota(nota_id, [CATEGORIAS_PRINCIPALES[categoria]])
                 actualizar_sesion(from_number, "estado", "esperando_autor")
                 return responder("✍️ ¿Quién es el autor de esta nota? Puedes escribir su nombre (ej: Isaí Lara Bermúdez).")
+            else:
+                return responder("⚠️ No se encontró el ID de nota para actualizar. Reinicia el flujo.")
         else:
             return responder("⚠️ Esa categoría no es válida. Prueba con una de estas: Seguridad, Comunidad, Política, etc.")
 
@@ -247,16 +257,13 @@ def twilio_webhook():
         nombre_autor = normalizar_nombre(body.strip(), AUTORES_DISPONIBLES)
         autor_id = AUTORES_DISPONIBLES.get(nombre_autor) if nombre_autor else None
         if autor_id:
-            actualizar_sesion(from_number, "autor_id", autor_id)
             nota_id = sesion.get("nota_id")
             if nota_id:
                 actualizar_autor_nota(nota_id, autor_id)
-            sesion = obtener_sesion(from_number)
-            if nota_completa(sesion):
-                return guardar_y_pedir_miniatura(from_number)
+                actualizar_sesion(from_number, "estado", "nota_confirmada")
+                return responder("✅ Nota completa. ¿Puedes enviarme la imagen de portada?")
             else:
-                actualizar_sesion(from_number, "estado", "esperando_categoria")
-                return responder("⚠️ Ahora indícame la categoría principal (ej: Seguridad, Comunidad).")
+                return responder("⚠️ No se encontró el ID de nota para actualizar. Reinicia el flujo.")
         else:
             return responder("❌ No encontré ese autor. Asegúrate de escribir su nombre correctamente.")
 
@@ -302,39 +309,25 @@ def procesar_nota_y_pedir_metadata(from_number, texto):
     resultado = procesar_nota_completa(texto)
     titulo = resultado.get("titulo")
     cuerpo = resultado.get("cuerpo")
-    categorias_ids = resultado.get("categorias_ids", [])
-    autor_id = resultado.get("autor_id")
 
+    nota_id = crear_nota_inicial(from_number, titulo, cuerpo)
+    actualizar_sesion(from_number, "nota_id", nota_id)
     actualizar_sesion(from_number, "titulo", titulo)
     actualizar_sesion(from_number, "cuerpo", cuerpo)
 
-    if not categorias_ids:
+    if not resultado.get("categorias_ids"):
         actualizar_sesion(from_number, "estado", "esperando_categoria")
         return responder("⚠️ No detectamos una *categoría principal* en la nota. Por favor, indícala (por ejemplo: Seguridad, Comunidad, Política).")
 
-    if not autor_id:
-        actualizar_sesion(from_number, "categorias", categorias_ids)
+    if not resultado.get("autor_id"):
+        actualizar_categoria_nota(nota_id, resultado["categorias_ids"])
         actualizar_sesion(from_number, "estado", "esperando_autor")
         return responder("✍️ ¿Quién es el autor de esta nota? Puedes escribir su nombre (ej: Isaí Lara Bermúdez).")
 
-    actualizar_sesion(from_number, "categorias", categorias_ids)
-    actualizar_sesion(from_number, "autor_id", autor_id)
-    return guardar_y_pedir_miniatura(from_number)
-
-def guardar_y_pedir_miniatura(from_number):
-    sesion = obtener_sesion(from_number)
-    nota_id = guardar_nota(from_number, sesion["titulo"], sesion["cuerpo"], sesion["categorias"], sesion["autor_id"])
-    actualizar_sesion(from_number, "nota_id", nota_id)
+    actualizar_categoria_nota(nota_id, resultado["categorias_ids"])
+    actualizar_autor_nota(nota_id, resultado["autor_id"])
     actualizar_sesion(from_number, "estado", "nota_confirmada")
     return responder("✅ Nota guardada con éxito. ¿Puedes enviarme la imagen de portada?")
-
-def nota_completa(sesion):
-    return all([
-        sesion.get("titulo"),
-        sesion.get("cuerpo"),
-        sesion.get("categorias"),
-        sesion.get("autor_id")
-    ])
 
 def responder(texto):
     return f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n    <Message>{texto}</Message>\n</Response>""", 200, {"Content-Type": "application/xml"}
