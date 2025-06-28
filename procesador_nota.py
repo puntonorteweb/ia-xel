@@ -67,13 +67,14 @@ def normalizar_nombre(nombre_usuario, opciones_validas, threshold=0.6):
 def publicar_nota_background(nota_id, from_number):
     try:
         ok, mensaje = publicar_nota_en_wordpress(nota_id)
-        resetear_sesion(from_number)
         if ok:
             print(f"[INFO] Nota {nota_id} publicada correctamente: {mensaje}")
         else:
             print(f"[ERROR] Fallo al publicar nota {nota_id}: {mensaje}")
     except Exception as e:
         print(f"[ERROR] Excepción al publicar nota {nota_id}: {e}")
+    finally:
+        resetear_sesion(from_number)
 
 def guardar_y_procesar_imagen(nota_id, posicion, media_url, from_number):
     try:

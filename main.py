@@ -129,22 +129,20 @@ def twilio_webhook():
             return responder(f"✅ Imagen {posicion} recibida. Envía más o escribe *listo* para finalizar.")
     elif body.lower() == "listo":
         actualizar_sesion(from_number, "estado", "finalizado")
-
-        # ⚠️ RECARGAMOS sesión actualizada
         sesion = obtener_sesion(from_number)
         nota_id = sesion.get("nota_id")
 
         if not nota_id:
             return responder("⚠️ Error interno: no encontré la nota para publicar.")
 
-        # 🔥 Lanzamos publicación en segundo plano
+        # Lanzamos publicación en segundo plano (sin resetear la sesión aquí)
         threading.Thread(
             target=publicar_nota_background,
             args=(nota_id, from_number)
         ).start()
 
-        # ✅ Responder de inmediato a Twilio para evitar timeout
         return responder("🚀 Publicando la nota... recibirás confirmación pronto.")
+
     else:
         return responder("❗ Por favor, envía una imagen o escribe *listo* para terminar.")
 
