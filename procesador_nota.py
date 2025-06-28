@@ -1,6 +1,7 @@
 # procesador_nota.py
 import re
 from difflib import get_close_matches
+from db_postgres import guardar_imagen
 
 # Listas de categorías
 CATEGORIAS_PRINCIPALES = {
@@ -60,6 +61,16 @@ def normalizar_nombre(nombre_usuario, opciones_validas, threshold=0.6):
     if coincidencias:
         return coincidencias[0]
     return None
+
+def guardar_y_procesar_imagen(nota_id, posicion, media_url, from_number):
+    try:
+        guardar_imagen(nota_id, "cuerpo", posicion, media_url)
+        print(f"[INFO] Imagen {posicion} guardada para nota {nota_id}")
+        # Aquí podrías subir la imagen a WP si lo necesitas al recibir cada foto:
+        # url_wp, media_id = subir_imagen_remota_a_wordpress(media_url, f"nota-{nota_id}-img-{posicion}")
+        # print(f"[INFO] Imagen subida a WP: {url_wp} (ID: {media_id})")
+    except Exception as e:
+        print(f"[ERROR] Fallo al procesar imagen {posicion}: {e}")
 
 def es_nota_estructurada(texto):
     lineas = [line.strip() for line in texto.strip().split('\n') if line.strip()]

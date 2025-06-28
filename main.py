@@ -1,7 +1,9 @@
 # main.py
 import os
+import threading
 from flask import Flask, request
 from dotenv import load_dotenv
+from procesador_nota import guardar_y_procesar_imagen
 from deepseek_client import interpretar_mensaje_conversacional
 from session_store import obtener_sesion, actualizar_sesion, resetear_sesion
 from db_postgres import (
@@ -113,9 +115,17 @@ def twilio_webhook():
             nota_id = sesion.get("nota_id")
             imagenes = sesion.get("imagenes", [])
             posicion = len(imagenes) + 1
-            guardar_imagen(nota_id, "cuerpo", posicion, media_url)
+
+            # Lanza procesamiento en segundo plano
+            threading.Thread(
+                target=guardar_y_procesar_imagen,
+                args=(nota_id, posicion, media_url, from_number)
+            ).start()
+
+            # Actualiza lista de imágenes solo en sesión para no perder control
             imagenes.append(media_url)
             actualizar_sesion(from_number, "imagenes", imagenes)
+
             return responder(f"✅ Imagen {posicion} recibida. Envía más o escribe *listo* para finalizar.")
         elif body.lower() == "listo":
             actualizar_sesion(from_number, "estado", "finalizado")
