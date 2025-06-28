@@ -3,7 +3,7 @@ import os
 import threading
 from flask import Flask, request
 from dotenv import load_dotenv
-from procesador_nota import guardar_y_procesar_imagen
+from procesador_nota import guardar_y_procesar_imagen, publicar_nota_background
 from deepseek_client import interpretar_mensaje_conversacional
 from session_store import obtener_sesion, actualizar_sesion, resetear_sesion
 from db_postgres import (
@@ -127,24 +127,27 @@ def twilio_webhook():
             actualizar_sesion(from_number, "imagenes", imagenes)
 
             return responder(f"✅ Imagen {posicion} recibida. Envía más o escribe *listo* para finalizar.")
-        elif body.lower() == "listo":
-            actualizar_sesion(from_number, "estado", "finalizado")
+    elif body.lower() == "listo":
+        actualizar_sesion(from_number, "estado", "finalizado")
 
-            # ⚠️ RECARGAMOS sesión actualizada
-            sesion = obtener_sesion(from_number)
-            nota_id = sesion.get("nota_id")
+        # ⚠️ RECARGAMOS sesión actualizada
+        sesion = obtener_sesion(from_number)
+        nota_id = sesion.get("nota_id")
 
-            if not nota_id:
-                return responder("⚠️ Error interno: no encontré la nota para publicar.")
-            
-            ok, mensaje = publicar_nota_en_wordpress(nota_id)
-            resetear_sesion(from_number)
-            if ok:
-                return responder(f"🚀 Publicando la nota...\n\n{mensaje}")
-            else:
-                return responder(f"⚠️ Ocurrió un error al publicar la nota:\n{mensaje}")
-        else:
-            return responder("❗ Por favor, envía una imagen o escribe *listo* para terminar.")
+        if not nota_id:
+            return responder("⚠️ Error interno: no encontré la nota para publicar.")
+
+        # 🔥 Lanzamos publicación en segundo plano
+        threading.Thread(
+            target=publicar_nota_background,
+            args=(nota_id, from_number)
+        ).start()
+
+        # ✅ Responder de inmediato a Twilio para evitar timeout
+        return responder("🚀 Publicando la nota... recibirás confirmación pronto.")
+    else:
+        return responder("❗ Por favor, envía una imagen o escribe *listo* para terminar.")
+
 
     return responder(
         "👋 Hola, soy tu asistente para publicar notas.\n\n"

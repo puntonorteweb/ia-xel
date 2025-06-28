@@ -2,6 +2,8 @@
 import re
 from difflib import get_close_matches
 from db_postgres import guardar_imagen
+from publicador import publicar_nota_en_wordpress
+from session_store import resetear_sesion
 
 # Listas de categorías
 CATEGORIAS_PRINCIPALES = {
@@ -61,6 +63,17 @@ def normalizar_nombre(nombre_usuario, opciones_validas, threshold=0.6):
     if coincidencias:
         return coincidencias[0]
     return None
+
+def publicar_nota_background(nota_id, from_number):
+    try:
+        ok, mensaje = publicar_nota_en_wordpress(nota_id)
+        resetear_sesion(from_number)
+        if ok:
+            print(f"[INFO] Nota {nota_id} publicada correctamente: {mensaje}")
+        else:
+            print(f"[ERROR] Fallo al publicar nota {nota_id}: {mensaje}")
+    except Exception as e:
+        print(f"[ERROR] Excepción al publicar nota {nota_id}: {e}")
 
 def guardar_y_procesar_imagen(nota_id, posicion, media_url, from_number):
     try:
